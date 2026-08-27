@@ -1,0 +1,170 @@
+{
+  "schema": "deepgemm-sm120-megamoe-g8-correctness-contract-v1",
+  "baseline": {
+    "repository_commit": "a35b6975b37449cc2358bd13ac885a3646bd9f0b",
+    "qualified_manifest": "examples/sm120_megamoe/qualified_g8/qualification-manifest.json",
+    "qualified_manifest_sha256": "e269894144ee7841c2b0c8dcf7e54173c80c56be06c117e2e852cc5fc909a7d2",
+    "kernel_sha256": "dffd9acdc32716a523a05d8970035fef203b97084b1d5bc1b03db018e5ab0cae",
+    "correctness_host_sha256": "1768c1a6815726caeeb8c22b21799acd5fabd2ef47623573b9ea0ed981d84798"
+  },
+  "fixed_scope": {
+    "physical_ranks": 8,
+    "routed_experts": 384,
+    "local_experts_per_rank": 48,
+    "top_k": 6,
+    "hidden": 7168,
+    "intermediate": 3072,
+    "output": 7168,
+    "epochs": 3,
+    "result_slots": [0, 1, 0],
+    "cooperative_ctas": 110,
+    "threads_per_cta": 384,
+    "dynamic_shared_memory_bytes": 94208
+  },
+  "oracle_boundary": {
+    "installed_oracles": ["zero", "analytic", "distinct_k32"],
+    "installed_oracle_kind": "independent_composed_cuda_sparse_fixture",
+    "installed_oracle_limit": "analytic and distinct_k32 select one K element per output; they do not exercise dense accumulation",
+    "dense_external_reader_present": true,
+    "dense_external_execution_present": true,
+    "dense_external_status": "controlled production-tensor adapter exports actual FP8/FP4/UE8M0 inputs and W1/requant/W2/combine buffers; P1/P2 plus P8/R1 are checked by the independent full-dimension PyTorch gate",
+    "authority_tiers": {
+      "primary_independent_math": "pure PyTorch BF16/FP32 composition with explicit FP8/FP4/UE8M0 decoding; compare by a documented numerical tolerance because CUDA fast-math is not bit-identical",
+      "secondary_differential": "DeepEP dispatch/combine plus DeepGEMM non-overlapped grouped GEMMs; useful for end-to-end differential testing but not mathematically independent because it shares DeepGEMM compute",
+      "existing_exact_sparse": "the frozen CUDA stage oracle is independent of donor output, but shares fixture/decode helpers and has only one nonzero K contribution per output"
+    },
+    "required_dense_references": [
+      "primary_independent_math",
+      "secondary_differential"
+    ]
+  },
+  "promotion_policy": {
+    "static_pytest_is_functional_qualification": false,
+    "dynamic_sparse_matrix_required": true,
+    "independent_dense_matrix_required": true,
+    "secondary_non_overlapped_differential_required": true,
+    "all_world8_cases_must_be_runtime_replayed": true,
+    "historical_sass_equivalence_is_runtime_replay": false,
+    "functional_qualified_until_all_requirements_pass": false
+  },
+  "dense_matrix_plan": {
+    "adapter_status": "controlled derived host validates frozen hashes and exports actual production inputs plus W1 BF16, SwiGLU/requant FP8+UE8M0, W2 BF16 partials, and combine output without modifying qualified_g8",
+    "required_primary_pytorch_cases": [
+      "p1-r1-random-balanced",
+      "p2-r1-random-balanced",
+      "p2-r2-random-skewed",
+      "p2-r2-random-balanced-partial-mask2",
+      "p2-r2-random-balanced-all-mask1",
+      "p1-r1-zero-activation",
+      "p1-r1-zero-w1",
+      "p1-r1-zero-w2",
+      "p2-r1-random-balanced-topk-permuted",
+      "p8-r1-random-balanced"
+    ],
+    "primary_pytorch_cases": [
+      "p1-r1-random-balanced",
+      "p2-r1-random-balanced",
+      "p2-r2-random-skewed",
+      "p2-r2-random-balanced-partial-mask2",
+      "p2-r2-random-balanced-all-mask1",
+      "p1-r1-zero-activation",
+      "p1-r1-zero-w1",
+      "p1-r1-zero-w2",
+      "p2-r1-random-balanced-topk-permuted",
+      "p8-r1-random-balanced"
+    ],
+    "secondary_non_overlapped_cases": [
+      "P8/R1 deterministic dense seed 20260819: DeepEP direct expanded dispatch/combine plus two DeepGEMM SM120 grouped FP8xFP4 GEMMs"
+    ],
+    "p8_dense_scope_rationale": "P8/R1 exercises all eight source ranks, real transport, all six routes, and every H7168/I3072/O7168 accumulation term using exported production tensors; P8/R113 and P8/R2048 remain current-binary sparse/protocol replays",
+    "metamorphic_checks": [
+      "permuting top-k slots and weights together preserves output",
+      "masking every route produces exact zero",
+      "zeroing activation, W1, or W2 produces exact zero at the applicable stages",
+      "repeating epochs across slots 0,1,0 preserves output"
+    ]
+  },
+  "cases": [
+    {
+      "id": "world1-r1-distinct-balanced-c110",
+      "tier": "smoke",
+      "world_size": 1,
+      "active_rows": 1,
+      "oracle": "distinct_k32",
+      "route_mode": "balanced",
+      "mask_period": 0
+    },
+    {
+      "id": "world2-r1-distinct-balanced-c110",
+      "tier": "smoke",
+      "world_size": 2,
+      "active_rows": 1,
+      "oracle": "distinct_k32",
+      "route_mode": "balanced",
+      "mask_period": 0
+    },
+    {
+      "id": "world2-r1-zero-balanced-mask1-c110",
+      "tier": "smoke",
+      "world_size": 2,
+      "active_rows": 1,
+      "oracle": "zero",
+      "route_mode": "balanced",
+      "mask_period": 1
+    },
+    {
+      "id": "world2-r17-analytic-balanced-mask7-c110",
+      "tier": "smoke",
+      "world_size": 2,
+      "active_rows": 17,
+      "oracle": "analytic",
+      "route_mode": "balanced",
+      "mask_period": 7
+    },
+    {
+      "id": "world2-r17-analytic-empty-mask0-c110",
+      "tier": "full",
+      "world_size": 2,
+      "active_rows": 17,
+      "oracle": "analytic",
+      "route_mode": "empty",
+      "mask_period": 0
+    },
+    {
+      "id": "world2-r17-analytic-skewed-mask0-c110",
+      "tier": "full",
+      "world_size": 2,
+      "active_rows": 17,
+      "oracle": "analytic",
+      "route_mode": "skewed",
+      "mask_period": 0
+    },
+    {
+      "id": "world4-r128-distinct-balanced-mask0-c110",
+      "tier": "full",
+      "world_size": 4,
+      "active_rows": 128,
+      "oracle": "distinct_k32",
+      "route_mode": "balanced",
+      "mask_period": 0
+    },
+    {
+      "id": "world8-r113-distinct-balanced-mask0-c110",
+      "tier": "full",
+      "world_size": 8,
+      "active_rows": 113,
+      "oracle": "distinct_k32",
+      "route_mode": "balanced",
+      "mask_period": 0
+    },
+    {
+      "id": "world8-r2048-distinct-balanced-mask0-c110",
+      "tier": "full",
+      "world_size": 8,
+      "active_rows": 2048,
+      "oracle": "distinct_k32",
+      "route_mode": "balanced",
+      "mask_period": 0
+    }
+  ]
+}
